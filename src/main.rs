@@ -31,7 +31,7 @@ use vulkano::instance::Instance;
 use vulkano::pipeline::graphics::color_blend::ColorBlendState;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
-use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};
+use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState, Scissor};
 use vulkano::pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint};
 use vulkano::render_pass::{Framebuffer, RenderPass, Subpass};
 use vulkano::sampler::{Filter, MipmapMode, Sampler, SamplerAddressMode};
@@ -373,6 +373,7 @@ fn main() {
     .unwrap();
 
     let subpass = Subpass::from(render_pass.clone(), 0).unwrap();
+
     // Before we draw we have to create what is called a pipeline. This is similar to an OpenGL
     // program, but much more specific.
     let pipeline = GraphicsPipeline::start()
@@ -608,7 +609,14 @@ fn window_size_dependent_setup(
     viewport: &mut Viewport,
 ) -> Vec<Arc<Framebuffer>> {
     let dimensions = images[0].dimensions().width_height();
-    viewport.dimensions = [dimensions[0] as f32, dimensions[1] as f32];
+    let width = dimensions[0] as f32;
+    let height = dimensions[1] as f32;
+
+    if width * 3.0 > height * 4.0 {
+        viewport.dimensions = [height * (4.0/3.0) as f32, height];
+    } else {
+        viewport.dimensions = [width, width * (3.0/4.0) as f32];
+    }
 
     images
         .iter()
