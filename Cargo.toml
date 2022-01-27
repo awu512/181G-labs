@@ -1,0 +1,17 @@
+[package]
+name = "triangle"
+version = "0.1.0"
+authors = ["Joseph C. Osborn <joseph.osborn@pomona.edu>"]
+edition = "2021"
+
+[dependencies]
+# Our graphics API
+vulkano = "0.27.1"
+# Conveniences for defining shaders
+vulkano-shaders = "0.27.1"
+# Opening windows in a cross-platform way
+winit = "0.25"
+# Connecting Vulkan to OS windows
+vulkano-win = "0.27.1"
+# Loading png images
+png = "0.17"
