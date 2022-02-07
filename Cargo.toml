@@ -1,0 +1,12 @@
+[package]
+name = "interactive-drawing"
+version = "0.1.0"
+authors = ["Joseph C. Osborn <joseph.osborn@pomona.edu>", "Aidan Wu <abwa2019@mymail.pomona.edu"]
+edition = "2021"
+
+[dependencies]
+vulkano = "0.27.1"
+vulkano-shaders = "0.27.1"
+winit = "0.25"
+vulkano-win = "0.27.1"
+png = "0.17"
