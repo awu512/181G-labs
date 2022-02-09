@@ -48,11 +48,32 @@ fn clear(fb:&mut [Color], c:Color) {
 }
 
 #[allow(dead_code)]
-fn line(fb: &mut [Color], x0: usize, x1: usize, y: usize, c: Color) {
-    assert!(y < HEIGHT);
-    assert!(x0 <= x1);
-    assert!(x1 < WIDTH);
-    fb[y*WIDTH+x0 .. (y*WIDTH+x1)].fill(c);
+fn line(fb: &mut [Color], (x0, y0): (usize, usize), (x1, y1): (usize, usize), col: Color) {
+    let mut x = x0 as i64;
+    let mut y = y0 as i64;
+    let x0 = x0 as i64;
+    let y0 = y0 as i64;
+    let x1 = x1 as i64;
+    let y1 = y1 as i64;
+    let dx = (x1 - x0).abs();
+    let sx: i64 = if x0 < x1 { 1 } else { -1 };
+    let dy = -(y1 - y0).abs();
+    let sy: i64 = if y0 < y1 { 1 } else { -1 };
+    let mut err = dx + dy;
+    while x != x1 || y != y1 {
+        fb[(y as usize * WIDTH + x as usize)
+           ..(y as usize * WIDTH + (x as usize + 1))]
+            .fill(col);
+        let e2 = 2 * err;
+        if dy <= e2 {
+            err += dy;
+            x += sx;
+        }
+        if e2 <= dx {
+            err += dx;
+            y += sy;
+        }
+    }
 }
 
 fn main() {
@@ -307,7 +328,7 @@ fn main() {
 
                 // We can update our local framebuffer here:
                 y = (y + 7) % HEIGHT;
-                line(&mut fb2d, WIDTH/4, WIDTH-WIDTH/4, y, (255-(y as u8 % 255), 0, y as u8 % 255, 255));
+                line(&mut fb2d, (WIDTH/4, HEIGHT/7), (WIDTH-WIDTH/4, HEIGHT), (255,255,255,255));
 
                 // Now we can copy into our buffer.
                 {
