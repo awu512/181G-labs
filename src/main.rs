@@ -31,7 +31,7 @@ use vulkano::swapchain::{self, AcquireError, Swapchain, SwapchainCreationError};
 use vulkano::sync::{self, FlushError, GpuFuture};
 use vulkano::Version;
 use vulkano_win::VkSurfaceBuild;
-use winit::event::{Event, WindowEvent};
+use winit::event::{Event, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{Window, WindowBuilder};
 
@@ -45,6 +45,11 @@ const HEIGHT: usize = 240;
 #[allow(dead_code)]
 fn clear(fb:&mut [Color], c:Color) {
     fb.fill(c);
+}
+
+#[allow(dead_code)]
+fn hline(fb: &mut [Color], x0: usize, x1: usize, y: usize, col: Color) {
+    fb[y*WIDTH + x0..y*WIDTH + x1].fill(col);
 }
 
 #[allow(dead_code)]
@@ -76,6 +81,7 @@ fn line(fb: &mut [Color], (x0, y0): (usize, usize), (x1, y1): (usize, usize), co
     }
 }
 
+#[allow(dead_code)]
 fn draw_filled_rect(fb: &mut [Color], (x0, y0): (usize, usize), (w, h): (usize, usize), col: Color) {
     for y in y0..(y0+h) {
         fb[(y*WIDTH + x0)..(y*WIDTH + x0 + w)].fill(col);
@@ -307,8 +313,17 @@ fn main() {
     let mut recreate_swapchain = false;
     let mut previous_frame_end = Some(sync::now(device.clone()).boxed());
 
-    let mut pos: (i32, i32) = (WIDTH as i32 / 2, HEIGHT as i32 / 2);
-    let mut vel: (i32, i32) = (1, 1);
+    let mut now_keys = [false; 255];
+    let mut prev_keys = now_keys.clone();
+
+    let mut w: usize = 200;
+    let y: usize = HEIGHT/2;
+    let colors = [(255,0,0,255), (0,255,0,255), (0,0,255,255)];
+    let mut color = 0;
+
+    // SCREENSAVER
+    // let mut pos: (i32, i32) = (WIDTH as i32 / 2, HEIGHT as i32 / 2);
+    // let mut vel: (i32, i32) = (1, 1);
 
     event_loop.run(move |event, _, control_flow| {
         match event {
@@ -324,6 +339,34 @@ fn main() {
             } => {
                 recreate_swapchain = true;
             },
+            Event::NewEvents(_) => {
+                // Leave now_keys alone, but copy over all changed keys
+                prev_keys.copy_from_slice(&now_keys);
+            },
+            Event::WindowEvent {
+                // Note this deeply nested pattern match
+                event: WindowEvent::KeyboardInput {
+                    input:winit::event::KeyboardInput {
+                        // Which serves to filter out only events we actually want
+                        virtual_keycode:Some(keycode),
+                        state,
+                        ..
+                    },
+                    ..
+                },
+                ..
+            } => {
+                // It also binds these handy variable names!
+                match state {
+                    winit::event::ElementState::Pressed => {
+                        // VirtualKeycode is an enum with a defined representation
+                        now_keys[keycode as usize] = true;
+                    },
+                    winit::event::ElementState::Released => {
+                        now_keys[keycode as usize] = false;
+                    }
+                }
+            },
             Event::MainEventsCleared => {
                 {
                     // We need to synchronize here to send new data to the GPU.
@@ -334,21 +377,46 @@ fn main() {
                     }
                 }
 
-                // screensaver moving rect
-                clear(&mut fb2d, (0,0,0,255));
-                let rect_width: usize = 50;
-                let rect_height: usize = 50;
-                draw_filled_rect(&mut fb2d, 
-                    (pos.0 as usize, pos.1 as usize), 
-                    (rect_width, rect_height), 
-                    (255,255,255,255));
-                if pos.0 as usize + rect_width == WIDTH || pos.0 == 0 {
-                    vel = (-1 * vel.0, vel.1);
+                // We can actually handle events now that we know what they all are.
+                if now_keys[VirtualKeyCode::Escape as usize] {
+                    *control_flow = ControlFlow::Exit;
                 }
-                if pos.1 as usize + rect_height == HEIGHT || pos.1 == 0 {
-                    vel = (vel.0, -1 * vel.1);
+                if now_keys[VirtualKeyCode::Up as usize] {
+                    color = (color + 1) % colors.len();
                 }
-                pos = (pos.0 + vel.0, pos.1 + vel.1);
+                if now_keys[VirtualKeyCode::Down as usize] {
+                    // What is this if doing?
+                    color = if color == 0 { colors.len() - 1 } else { color - 1 };
+                }
+                if now_keys[VirtualKeyCode::Left as usize] && w > 0 {
+                    w -= 1;
+                }
+                if now_keys[VirtualKeyCode::Right as usize] && w < WIDTH - 1 {
+                    w += 1;
+                }
+                // Exercise for the reader: Tie y to mouse movement
+
+                // It's debatable whether the following code should live here or in the drawing section.
+                // First clear the framebuffer...
+                clear(&mut fb2d, (128,64,64,255));
+                // Then draw our line:
+                hline(&mut fb2d, WIDTH/2-w/2, WIDTH/2+w/2, y, colors[color]);
+
+                // SCREENSAVER
+                // clear(&mut fb2d, (0,0,0,255));
+                // let rect_width: usize = 50;
+                // let rect_height: usize = 50;
+                // draw_filled_rect(&mut fb2d, 
+                //     (pos.0 as usize, pos.1 as usize), 
+                //     (rect_width, rect_height), 
+                //     (255,255,255,255));
+                // if pos.0 as usize + rect_width == WIDTH || pos.0 == 0 {
+                //     vel = (-1 * vel.0, vel.1);
+                // }
+                // if pos.1 as usize + rect_height == HEIGHT || pos.1 == 0 {
+                //     vel = (vel.0, -1 * vel.1);
+                // }
+                // pos = (pos.0 + vel.0, pos.1 + vel.1);
 
                 // Now we can copy into our buffer.
                 {
