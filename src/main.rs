@@ -53,6 +53,13 @@ fn hline(fb: &mut [Color], x0: usize, x1: usize, y: usize, col: Color) {
 }
 
 #[allow(dead_code)]
+fn vline(fb: &mut [Color], x: usize, y0: usize, y1: usize, col: Color) {
+    for y in y0..y1 {
+        fb[y * WIDTH + x..y * WIDTH + x + 1].fill(col) // QUESTION: how to apply fill to single cell
+    }
+}
+
+#[allow(dead_code)]
 fn line(fb: &mut [Color], (x0, y0): (usize, usize), (x1, y1): (usize, usize), col: Color) {
     let mut x = x0 as i64;
     let mut y = y0 as i64;
@@ -86,6 +93,14 @@ fn draw_filled_rect(fb: &mut [Color], (x0, y0): (usize, usize), (w, h): (usize, 
     for y in y0..(y0+h) {
         fb[(y*WIDTH + x0)..(y*WIDTH + x0 + w)].fill(col);
     }
+}
+
+#[allow(dead_code)]
+fn draw_outlined_rect(fb: &mut [Color], (x0,y0): (usize,usize), (w,h): (usize,usize), col: Color) {
+    hline(fb, x0, x0 + w, y0, col);
+    hline(fb, x0, x0 + w, y0 + h, col);
+    vline(fb, x0, y0, y0 + h, col);
+    vline(fb, x0 + w, y0, y0 + h, col);
 }
 
 fn main() {
@@ -394,13 +409,12 @@ fn main() {
                 if now_keys[VirtualKeyCode::Right as usize] && w < WIDTH - 1 {
                     w += 1;
                 }
-                // Exercise for the reader: Tie y to mouse movement
+                
+                clear(&mut fb2d, (255,255,255,255));
 
-                // It's debatable whether the following code should live here or in the drawing section.
-                // First clear the framebuffer...
-                clear(&mut fb2d, (128,64,64,255));
-                // Then draw our line:
-                hline(&mut fb2d, WIDTH/2-w/2, WIDTH/2+w/2, y, colors[color]);
+                // hline(&mut fb2d, WIDTH/2-w/2, WIDTH/2+w/2, y, colors[color]);
+                draw_outlined_rect(&mut fb2d, (WIDTH/3,HEIGHT/3), (WIDTH/3,HEIGHT/3), colors[color]);
+                
 
                 // SCREENSAVER
                 // clear(&mut fb2d, (0,0,0,255));
