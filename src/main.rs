@@ -76,6 +76,12 @@ fn line(fb: &mut [Color], (x0, y0): (usize, usize), (x1, y1): (usize, usize), co
     }
 }
 
+fn draw_filled_rect(fb: &mut [Color], (x0, y0): (usize, usize), (w, h): (usize, usize), col: Color) {
+    for y in y0..(y0+h) {
+        fb[(y*WIDTH + x0)..(y*WIDTH + x0 + w)].fill(col);
+    }
+}
+
 fn main() {
     let required_extensions = vulkano_win::required_extensions();
     let instance = Instance::new(None, Version::V1_1, &required_extensions, None).unwrap();
@@ -301,7 +307,9 @@ fn main() {
     let mut recreate_swapchain = false;
     let mut previous_frame_end = Some(sync::now(device.clone()).boxed());
 
-    let mut y = 0;
+    let mut pos: (i32, i32) = (WIDTH as i32 / 2, HEIGHT as i32 / 2);
+    let mut vel: (i32, i32) = (1, 1);
+
     event_loop.run(move |event, _, control_flow| {
         match event {
             Event::WindowEvent {
@@ -326,9 +334,21 @@ fn main() {
                     }
                 }
 
-                // We can update our local framebuffer here:
-                y = (y + 7) % HEIGHT;
-                line(&mut fb2d, (WIDTH/4, HEIGHT/7), (WIDTH-WIDTH/4, HEIGHT), (255,255,255,255));
+                // screensaver moving rect
+                clear(&mut fb2d, (0,0,0,255));
+                let rect_width: usize = 50;
+                let rect_height: usize = 50;
+                draw_filled_rect(&mut fb2d, 
+                    (pos.0 as usize, pos.1 as usize), 
+                    (rect_width, rect_height), 
+                    (255,255,255,255));
+                if pos.0 as usize + rect_width == WIDTH || pos.0 == 0 {
+                    vel = (-1 * vel.0, vel.1);
+                }
+                if pos.1 as usize + rect_height == HEIGHT || pos.1 == 0 {
+                    vel = (vel.0, -1 * vel.1);
+                }
+                pos = (pos.0 + vel.0, pos.1 + vel.1);
 
                 // Now we can copy into our buffer.
                 {
