@@ -41,6 +41,22 @@ type Color = (u8,u8,u8,u8);
 const WIDTH: usize = 320;
 const HEIGHT: usize = 240;
 
+#[derive(Copy, Clone)]
+struct Position {
+    x: usize,
+    y: usize
+}
+
+impl Position {
+    fn incx(&mut self, scalar: usize) {
+        self.x += scalar;
+    }
+
+    fn decx(&mut self, scalar: usize) {
+        self.x -= scalar;
+    }
+}
+
 // Here's what clear looks like, though we won't use it
 #[allow(dead_code)]
 fn clear(fb:&mut [Color], c:Color) {
@@ -60,13 +76,13 @@ fn vline(fb: &mut [Color], x: usize, y0: usize, y1: usize, col: Color) {
 }
 
 #[allow(dead_code)]
-fn line(fb: &mut [Color], (x0, y0): (usize, usize), (x1, y1): (usize, usize), col: Color) {
-    let mut x = x0 as i64;
-    let mut y = y0 as i64;
-    let x0 = x0 as i64;
-    let y0 = y0 as i64;
-    let x1 = x1 as i64;
-    let y1 = y1 as i64;
+fn line(fb: &mut [Color], p0: Position, p1: Position, col: Color) {
+    let mut x = p0.x as i64;
+    let mut y = p0.y as i64;
+    let x0 = p0.x as i64;
+    let y0 = p0.y as i64;
+    let x1 = p1.x as i64;
+    let y1 = p1.y as i64;
     let dx = (x1 - x0).abs();
     let sx: i64 = if x0 < x1 { 1 } else { -1 };
     let dy = -(y1 - y0).abs();
@@ -89,18 +105,18 @@ fn line(fb: &mut [Color], (x0, y0): (usize, usize), (x1, y1): (usize, usize), co
 }
 
 #[allow(dead_code)]
-fn draw_filled_rect(fb: &mut [Color], (x0, y0): (usize, usize), (w, h): (usize, usize), col: Color) {
-    for y in y0..(y0+h) {
-        fb[(y*WIDTH + x0)..(y*WIDTH + x0 + w)].fill(col);
+fn draw_filled_rect(fb: &mut [Color], p0: Position, p1: Position, col: Color) {
+    for y in p0.y..p1.y {
+        fb[(y*WIDTH + p0.x)..(y*WIDTH + p1.x)].fill(col);
     }
 }
 
 #[allow(dead_code)]
-fn draw_outlined_rect(fb: &mut [Color], (x0,y0): (usize,usize), (w,h): (usize,usize), col: Color) {
-    hline(fb, x0, x0 + w, y0, col);
-    hline(fb, x0, x0 + w, y0 + h, col);
-    vline(fb, x0, y0, y0 + h, col);
-    vline(fb, x0 + w, y0, y0 + h, col);
+fn draw_outlined_rect(fb: &mut [Color], p0: Position, p1: Position, col: Color) {
+    hline(fb, p0.x, p1.x, p0.y, col);
+    hline(fb, p0.x, p1.x, p1.y, col);
+    vline(fb, p0.x, p0.y, p1.y, col);
+    vline(fb, p1.x, p0.y, p1.y, col);
 }
 
 fn main() {
@@ -330,11 +346,22 @@ fn main() {
 
     let mut now_keys = [false; 255];
     let mut prev_keys = now_keys.clone();
-
-    let mut w: usize = 200;
-    let y: usize = HEIGHT/2;
+    
     let colors = [(255,0,0,255), (0,255,0,255), (0,0,255,255)];
     let mut color = 0;
+
+    let x_unit = WIDTH/3;
+    let y_unit = HEIGHT/7;
+
+    // vertices of outlined rect
+    let mut p1 = Position { x: x_unit, y: y_unit };
+    let mut p2 = Position { x: 2*x_unit, y: 3*y_unit };
+    let mut p3 = Position { x: x_unit, y: 3*y_unit };
+    let mut p4 = Position { x: 2*x_unit, y: y_unit };
+
+    // tl and br vertices of filled rect
+    let mut p5 = Position { x: x_unit, y: 4*y_unit };
+    let mut p6 = Position { x: 2*x_unit, y: 6*y_unit };
 
     // SCREENSAVER
     // let mut pos: (i32, i32) = (WIDTH as i32 / 2, HEIGHT as i32 / 2);
@@ -403,17 +430,30 @@ fn main() {
                     // What is this if doing?
                     color = if color == 0 { colors.len() - 1 } else { color - 1 };
                 }
-                if now_keys[VirtualKeyCode::Left as usize] && w > 0 {
-                    w -= 1;
+                if now_keys[VirtualKeyCode::Left as usize] && p2.x - p1.x > 0 && p4.x - p3.x > 0 {
+                    p1.incx(1);
+                    p2.decx(1);
+                    p3.incx(1);
+                    p4.decx(1);
+                    p5.incx(1);
+                    p6.decx(1);
                 }
-                if now_keys[VirtualKeyCode::Right as usize] && w < WIDTH - 1 {
-                    w += 1;
+                if now_keys[VirtualKeyCode::Right as usize] && p2.x - p1.x < WIDTH - 1 && p4.x - p3.x < WIDTH -1 {
+                    p1.decx(1);
+                    p2.incx(1);
+                    p3.decx(1);
+                    p4.incx(1);
+                    p5.decx(1);
+                    p6.incx(1);
                 }
                 
                 clear(&mut fb2d, (255,255,255,255));
 
-                // hline(&mut fb2d, WIDTH/2-w/2, WIDTH/2+w/2, y, colors[color]);
-                draw_outlined_rect(&mut fb2d, (WIDTH/3,HEIGHT/3), (WIDTH/3,HEIGHT/3), colors[color]);
+                draw_outlined_rect(&mut fb2d, p1, p2, colors[color]);
+                line(&mut fb2d, p1, p2, colors[color]);
+                line(&mut fb2d, p3, p4, colors[color]);
+
+                draw_filled_rect(&mut fb2d, p5, p6, colors[color]);
                 
 
                 // SCREENSAVER
