@@ -346,12 +346,17 @@ fn main() {
 
     let mut now_keys = [false; 255];
     let mut prev_keys = now_keys.clone();
+
+    let mut now_lmouse = false;
+    let mut prev_lmouse = false;
     
     let colors = [(255,0,0,255), (0,255,0,255), (0,0,255,255)];
     let mut color = 0;
 
     let x_unit = WIDTH/3;
     let y_unit = HEIGHT/7;
+
+    let mut vel = 1_usize;
 
     // vertices of outlined rect
     let mut p1 = Position { x: x_unit, y: y_unit };
@@ -362,6 +367,8 @@ fn main() {
     // tl and br vertices of filled rect
     let mut p5 = Position { x: x_unit, y: 4*y_unit };
     let mut p6 = Position { x: 2*x_unit, y: 6*y_unit };
+    let mut p7 = Position { x: x_unit, y: 6*y_unit };
+    let mut p8 = Position { x: 2*x_unit, y: 4*y_unit };
 
     // SCREENSAVER
     // let mut pos: (i32, i32) = (WIDTH as i32 / 2, HEIGHT as i32 / 2);
@@ -384,6 +391,7 @@ fn main() {
             Event::NewEvents(_) => {
                 // Leave now_keys alone, but copy over all changed keys
                 prev_keys.copy_from_slice(&now_keys);
+                prev_lmouse = now_lmouse;
             },
             Event::WindowEvent {
                 // Note this deeply nested pattern match
@@ -409,6 +417,29 @@ fn main() {
                     }
                 }
             },
+            Event::WindowEvent {
+                event: WindowEvent::MouseInput {
+                    button:btn,
+                    state,
+                    ..
+                },
+                ..
+            } => {
+                match btn {
+                    winit::event::MouseButton::Left => {
+                        match state {
+                            winit::event::ElementState::Pressed => {
+                                // VirtualKeycode is an enum with a defined representation
+                                now_lmouse = true;
+                            },
+                            winit::event::ElementState::Released => {
+                                now_lmouse = false;
+                            }
+                        }
+                    },
+                    _ => {}
+                }
+            },
             Event::MainEventsCleared => {
                 {
                     // We need to synchronize here to send new data to the GPU.
@@ -420,8 +451,22 @@ fn main() {
                 }
 
                 // We can actually handle events now that we know what they all are.
+                // Mouse Events
+                if now_lmouse && !prev_lmouse {
+                    std::mem::swap(&mut p1, &mut p5);
+                    std::mem::swap(&mut p2, &mut p6);
+                    std::mem::swap(&mut p3, &mut p7);
+                    std::mem::swap(&mut p4, &mut p8);
+                }
+
+                // Keyboard Events
                 if now_keys[VirtualKeyCode::Escape as usize] {
                     *control_flow = ControlFlow::Exit;
+                }
+                if now_keys[VirtualKeyCode::LShift as usize] || now_keys[VirtualKeyCode::RShift as usize] {
+                    vel = 2; // Why is there a warning here?
+                } else {
+                    vel = 1;
                 }
                 if now_keys[VirtualKeyCode::Up as usize] {
                     color = (color + 1) % colors.len();
@@ -430,21 +475,23 @@ fn main() {
                     // What is this if doing?
                     color = if color == 0 { colors.len() - 1 } else { color - 1 };
                 }
-                if now_keys[VirtualKeyCode::Left as usize] && p2.x - p1.x > 0 && p4.x - p3.x > 0 {
-                    p1.incx(1);
-                    p2.decx(1);
-                    p3.incx(1);
-                    p4.decx(1);
-                    p5.incx(1);
-                    p6.decx(1);
+                
+                if now_keys[VirtualKeyCode::Left as usize] && p2.x - p1.x - vel > 0 && p6.x - p5.x - vel > 0 {
+                    
+                    p1.incx(vel);
+                    p2.decx(vel);
+                    p3.incx(vel);
+                    p4.decx(vel);
+                    p5.incx(vel);
+                    p6.decx(vel);
                 }
-                if now_keys[VirtualKeyCode::Right as usize] && p2.x - p1.x < WIDTH - 1 && p4.x - p3.x < WIDTH -1 {
-                    p1.decx(1);
-                    p2.incx(1);
-                    p3.decx(1);
-                    p4.incx(1);
-                    p5.decx(1);
-                    p6.incx(1);
+                if now_keys[VirtualKeyCode::Right as usize] && p2.x - p1.x + 2*vel < WIDTH && p6.x - p5.x + 2*vel < WIDTH {
+                    p1.decx(vel);
+                    p2.incx(vel);
+                    p3.decx(vel);
+                    p4.incx(vel);
+                    p5.decx(vel);
+                    p6.incx(vel);
                 }
                 
                 clear(&mut fb2d, (255,255,255,255));
@@ -454,7 +501,6 @@ fn main() {
                 line(&mut fb2d, p3, p4, colors[color]);
 
                 draw_filled_rect(&mut fb2d, p5, p6, colors[color]);
-                
 
                 // SCREENSAVER
                 // clear(&mut fb2d, (0,0,0,255));
