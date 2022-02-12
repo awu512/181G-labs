@@ -1,5 +1,5 @@
 [package]
-name = "interactive-drawing"
+name = "game-feel"
 version = "0.1.0"
 authors = ["Joseph C. Osborn <joseph.osborn@pomona.edu>", "Aidan Wu <abwa2019@mymail.pomona.edu"]
 edition = "2021"

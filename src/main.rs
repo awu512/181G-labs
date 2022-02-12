@@ -42,18 +42,59 @@ const WIDTH: usize = 320;
 const HEIGHT: usize = 240;
 
 #[derive(Copy, Clone)]
-struct Position {
+struct Rect {
     x: usize,
-    y: usize
+    y: usize,
+    width: usize,
+    height: usize,
+    color: Color
 }
 
-impl Position {
-    fn incx(&mut self, scalar: usize) {
-        self.x += scalar;
+impl Rect {
+    fn change_color_to(&mut self, new: Color) {
+        self.color = new;
     }
 
-    fn decx(&mut self, scalar: usize) {
-        self.x -= scalar;
+    fn left(self) -> usize {
+        self.x
+    }
+
+    fn right(self) -> usize {
+        self.x + self.width
+    }
+
+    fn top(self) -> usize {
+        self.y
+    }
+
+    fn bottom(self) -> usize {
+        self.y + self.height
+    }
+
+    fn change_x_by(&mut self, change: f32) {
+        let mut x = self.x as f32;
+        x = x + change;
+
+        if x < 0.0 {
+            self.x = 0;
+        } else if x as usize + self.width > WIDTH {
+            self.x = WIDTH - self.width;
+        } else {
+            self.x = x as usize;
+        }
+    }
+
+    fn change_y_by(&mut self, change: f32) {
+        let mut y = self.y as f32;
+        y = y + change;
+
+        if y < 0.0 {
+            self.y = 0;
+        } else if y as usize + self.height > HEIGHT {
+            self.y = HEIGHT - self.height;
+        } else {
+            self.y = y as usize;
+        }
     }
 }
 
@@ -64,59 +105,10 @@ fn clear(fb:&mut [Color], c:Color) {
 }
 
 #[allow(dead_code)]
-fn hline(fb: &mut [Color], x0: usize, x1: usize, y: usize, col: Color) {
-    fb[y*WIDTH + x0..y*WIDTH + x1].fill(col);
-}
-
-#[allow(dead_code)]
-fn vline(fb: &mut [Color], x: usize, y0: usize, y1: usize, col: Color) {
-    for y in y0..y1 {
-        fb[y * WIDTH + x..y * WIDTH + x + 1].fill(col) // QUESTION: how to apply fill to single cell
+fn draw_filled_rect(fb: &mut [Color], rect: Rect) {
+    for y in rect.top()..rect.bottom() {
+        fb[(y*WIDTH + rect.left())..(y*WIDTH + rect.right())].fill(rect.color);
     }
-}
-
-#[allow(dead_code)]
-fn line(fb: &mut [Color], p0: Position, p1: Position, col: Color) {
-    let mut x = p0.x as i64;
-    let mut y = p0.y as i64;
-    let x0 = p0.x as i64;
-    let y0 = p0.y as i64;
-    let x1 = p1.x as i64;
-    let y1 = p1.y as i64;
-    let dx = (x1 - x0).abs();
-    let sx: i64 = if x0 < x1 { 1 } else { -1 };
-    let dy = -(y1 - y0).abs();
-    let sy: i64 = if y0 < y1 { 1 } else { -1 };
-    let mut err = dx + dy;
-    while x != x1 || y != y1 {
-        fb[(y as usize * WIDTH + x as usize)
-           ..(y as usize * WIDTH + (x as usize + 1))]
-            .fill(col);
-        let e2 = 2 * err;
-        if dy <= e2 {
-            err += dy;
-            x += sx;
-        }
-        if e2 <= dx {
-            err += dx;
-            y += sy;
-        }
-    }
-}
-
-#[allow(dead_code)]
-fn draw_filled_rect(fb: &mut [Color], p0: Position, p1: Position, col: Color) {
-    for y in p0.y..p1.y {
-        fb[(y*WIDTH + p0.x)..(y*WIDTH + p1.x)].fill(col);
-    }
-}
-
-#[allow(dead_code)]
-fn draw_outlined_rect(fb: &mut [Color], p0: Position, p1: Position, col: Color) {
-    hline(fb, p0.x, p1.x, p0.y, col);
-    hline(fb, p0.x, p1.x, p1.y, col);
-    vline(fb, p0.x, p0.y, p1.y, col);
-    vline(fb, p1.x, p0.y, p1.y, col);
 }
 
 fn main() {
@@ -350,29 +342,26 @@ fn main() {
     let mut now_lmouse = false;
     let mut prev_lmouse = false;
     
-    let colors = [(255,0,0,255), (0,255,0,255), (0,0,255,255)];
-    let mut color = 0;
+    let white = (255, 255, 255, 255);
 
-    let x_unit = WIDTH/3;
-    let y_unit = HEIGHT/7;
+    let w = 5_usize;
+    let h = 10_usize;
 
-    let mut vel = 1_usize;
+    let mut player = Rect {
+        x: WIDTH/2 - w/2,
+        y: HEIGHT - h,
+        width: w,
+        height: h,
+        color: white
+    };
 
-    // vertices of outlined rect
-    let mut p1 = Position { x: x_unit, y: y_unit };
-    let mut p2 = Position { x: 2*x_unit, y: 3*y_unit };
-    let mut p3 = Position { x: x_unit, y: 3*y_unit };
-    let mut p4 = Position { x: 2*x_unit, y: y_unit };
+    let mut dash = false;
+    let mut dash_count = 0_u8;
 
-    // tl and br vertices of filled rect
-    let mut p5 = Position { x: x_unit, y: 4*y_unit };
-    let mut p6 = Position { x: 2*x_unit, y: 6*y_unit };
-    let mut p7 = Position { x: x_unit, y: 6*y_unit };
-    let mut p8 = Position { x: 2*x_unit, y: 4*y_unit };
-
-    // SCREENSAVER
-    // let mut pos: (i32, i32) = (WIDTH as i32 / 2, HEIGHT as i32 / 2);
-    // let mut vel: (i32, i32) = (1, 1);
+    let mut vx = 0.0;
+    let mut vy = 0.0;
+    let mut ax = 0.0;
+    let mut ay = 0.2;
 
     event_loop.run(move |event, _, control_flow| {
         match event {
@@ -450,13 +439,9 @@ fn main() {
                     }
                 }
 
-                // We can actually handle events now that we know what they all are.
                 // Mouse Events
                 if now_lmouse && !prev_lmouse {
-                    std::mem::swap(&mut p1, &mut p5);
-                    std::mem::swap(&mut p2, &mut p6);
-                    std::mem::swap(&mut p3, &mut p7);
-                    std::mem::swap(&mut p4, &mut p8);
+                    
                 }
 
                 // Keyboard Events
@@ -464,59 +449,66 @@ fn main() {
                     *control_flow = ControlFlow::Exit;
                 }
                 if now_keys[VirtualKeyCode::LShift as usize] || now_keys[VirtualKeyCode::RShift as usize] {
-                    vel = 2; // Why is there a warning here?
-                } else {
-                    vel = 1;
-                }
-                if now_keys[VirtualKeyCode::Up as usize] {
-                    color = (color + 1) % colors.len();
-                }
-                if now_keys[VirtualKeyCode::Down as usize] {
-                    // What is this if doing?
-                    color = if color == 0 { colors.len() - 1 } else { color - 1 };
-                }
-                
-                if now_keys[VirtualKeyCode::Left as usize] && p2.x - p1.x - vel > 0 && p6.x - p5.x - vel > 0 {
                     
-                    p1.incx(vel);
-                    p2.decx(vel);
-                    p3.incx(vel);
-                    p4.decx(vel);
-                    p5.incx(vel);
-                    p6.decx(vel);
+                } else {
+                    
                 }
-                if now_keys[VirtualKeyCode::Right as usize] && p2.x - p1.x + 2*vel < WIDTH && p6.x - p5.x + 2*vel < WIDTH {
-                    p1.decx(vel);
-                    p2.incx(vel);
-                    p3.decx(vel);
-                    p4.incx(vel);
-                    p5.decx(vel);
-                    p6.incx(vel);
+
+
+                if now_keys[VirtualKeyCode::Up as usize] && !prev_keys[VirtualKeyCode::Up as usize] && !dash {
+                    vy = -5.0;
+                }
+
+                if now_keys[VirtualKeyCode::Down as usize] && !prev_keys[VirtualKeyCode::Up as usize] && !dash {
+                    dash = true;
+                    vx = 0.0;
+                    vy = 0.0;
+                    ax = 0.0;
+                    ay = 0.0;
+                }
+                if now_keys[VirtualKeyCode::Left as usize] {
+                    if dash {
+                        dash = false;
+                        ay = 0.2;
+                        player.change_color_to(white);
+                        vx = -(dash_count as f32 / 25.0);
+                        dash_count = 0;
+                    } else {
+                        if vx > -2.0 { ax = -0.2; } 
+                        else { ax = 0.0 }
+                    }
+                } else if now_keys[VirtualKeyCode::Right as usize] {
+                    if dash {
+                        dash = false;
+                        ay = 0.2;
+                        player.change_color_to(white);
+                        vx = dash_count as f32 / 25.0;
+                        dash_count = 0;
+                    } else {
+                        if vx < 2.0 { ax = 0.2; } 
+                        else { ax = 0.0 }
+                    }
+                } else {
+                    if vx > 0.09 { ax = -0.1 }
+                    else if vx < -0.09 { ax = 0.1 }
+                    else { ax = 0.0 }
+                }
+
+                vx += ax;
+                player.change_x_by(vx);
+
+                vy += ay;
+                player.change_y_by(vy);
+
+                if dash {
+                    player.change_color_to((255-dash_count,255,255-dash_count,255));
+                    if dash_count < 255 { dash_count += 5; }
                 }
                 
-                clear(&mut fb2d, (255,255,255,255));
+                clear(&mut fb2d, (128,64,64,255));
 
-                draw_outlined_rect(&mut fb2d, p1, p2, colors[color]);
-                line(&mut fb2d, p1, p2, colors[color]);
-                line(&mut fb2d, p3, p4, colors[color]);
-
-                draw_filled_rect(&mut fb2d, p5, p6, colors[color]);
-
-                // SCREENSAVER
-                // clear(&mut fb2d, (0,0,0,255));
-                // let rect_width: usize = 50;
-                // let rect_height: usize = 50;
-                // draw_filled_rect(&mut fb2d, 
-                //     (pos.0 as usize, pos.1 as usize), 
-                //     (rect_width, rect_height), 
-                //     (255,255,255,255));
-                // if pos.0 as usize + rect_width == WIDTH || pos.0 == 0 {
-                //     vel = (-1 * vel.0, vel.1);
-                // }
-                // if pos.1 as usize + rect_height == HEIGHT || pos.1 == 0 {
-                //     vel = (vel.0, -1 * vel.1);
-                // }
-                // pos = (pos.0 + vel.0, pos.1 + vel.1);
+                draw_filled_rect(&mut fb2d, player);
+                
 
                 // Now we can copy into our buffer.
                 {
